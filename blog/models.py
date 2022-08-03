@@ -1,7 +1,35 @@
+from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Count
 from django.urls import reverse
-from django.contrib.auth.models import User
+
+
+class PostQuerySet(models.QuerySet):
+    def popular(self):
+        return (self.prefetch_related('author')
+                    .annotate(likes_count=Count('likes', distinct=True))
+                    .order_by('-likes_count')
+                )
+
+    def fetch_with_comments_count(self):
+        ids = [post.id for post in self]
+        count_for_id = dict(
+            Post.objects.filter(id__in=ids)
+                .annotate(comments_count=Count('comments',distinct=True))
+                .values_list('id', 'comments_count')
+        )
+        for post in self:
+            post.comments_count = count_for_id[post.id]
+        return self
+
+    def most_popular(self,quantity):
+        return self.popular()[:quantity].fetch_with_comments_count()
+
+    def most_fresh(self,quantity):
+        return (Post.objects.prefetch_related('author')
+                .order_by('-published_at')[:quantity]
+                .annotate(comments_count=Count('comments', distinct=True))
+                )
 
 
 class Post(models.Model):
@@ -10,6 +38,8 @@ class Post(models.Model):
     slug = models.SlugField('Название в виде url', max_length=200)
     image = models.ImageField('Картинка')
     published_at = models.DateTimeField('Дата и время публикации')
+
+    objects = PostQuerySet.as_manager()
 
     author = models.ForeignKey(
         User,
@@ -26,6 +56,8 @@ class Post(models.Model):
         related_name='posts',
         verbose_name='Теги')
 
+    objects = PostQuerySet.as_manager()
+
     def __str__(self):
         return self.title
 
@@ -37,9 +69,13 @@ class Post(models.Model):
         verbose_name = 'пост'
         verbose_name_plural = 'посты'
 
+
 class TagQuerySet(models.QuerySet):
     def popular(self):
         return self.annotate(posts_count=Count('posts')).order_by('-posts_count')
+    def most_popular(self,quantity):
+        return self.popular()[:quantity]
+
 
 class Tag(models.Model):
     title = models.CharField('Тег', max_length=20, unique=True)

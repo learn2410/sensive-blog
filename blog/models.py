@@ -6,7 +6,7 @@ from django.urls import reverse
 
 class PostQuerySet(models.QuerySet):
     def popular(self):
-        return (self.prefetch_related('author')
+        return (self.prefetch_related('author','tags')
                     .annotate(likes_count=Count('likes', distinct=True))
                     .order_by('-likes_count')
                 )
@@ -26,7 +26,7 @@ class PostQuerySet(models.QuerySet):
         return self.popular()[:quantity].fetch_with_comments_count()
 
     def most_fresh(self,quantity):
-        return (Post.objects.prefetch_related('author')
+        return (Post.objects.prefetch_related('author','tags')
                 .order_by('-published_at')[:quantity]
                 .annotate(comments_count=Count('comments', distinct=True))
                 )

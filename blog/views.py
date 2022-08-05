@@ -23,6 +23,10 @@ def get_likes_count(post):
 #     }
 
 def serialize_post_optimized(post):
+    tags=(post.tags
+          .annotate(posts_with_tag=Count('posts'))
+          .values('title','posts_with_tag')
+          )
     return {
         'title': post.title,
         'teaser_text': post.text[:200],
@@ -31,7 +35,7 @@ def serialize_post_optimized(post):
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
-        'tags': [serialize_tag(tag) for tag in post.tags.all()],
+        'tags': tags,
         'first_tag_title': post.tags.all()[0].title,
     }
 

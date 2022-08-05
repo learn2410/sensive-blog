@@ -32,6 +32,7 @@ class PostQuerySet(models.QuerySet):
                 )
 
 
+
 class Post(models.Model):
     title = models.CharField('Заголовок', max_length=200)
     text = models.TextField('Текст')

@@ -8,7 +8,6 @@ from blog.models import Post, Tag, Comment
 class PostAdmin(admin.ModelAdmin):
     list_per_page = 25
     list_display = ('id','title','published_at')
-    # list_filter = ['author']
     raw_id_fields = ('author', 'tags', 'likes')
 
 admin.site.register(Tag)
@@ -25,7 +24,6 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ('post','author','text','published_at')
     search_fields = ('text',)
     ordering=('pk',)
-    # list_filter = ['post','author']
 
     def get_queryset(self, request):
         queryset = super(CommentAdmin, self).get_queryset(request)

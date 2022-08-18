@@ -18,6 +18,8 @@ def index(request):
 
 def post_detail(request, slug):
     post = Post.objects.get(slug=slug)
+    popular_posts_ids = Post.objects.popular_ids(5)
+    posts = Post.objects.serialized(popular_posts_ids+[post.id])
 
     comments = Comment.objects.filter(post=post.id).select_related('author')
     serialized_comments = []
@@ -28,22 +30,18 @@ def post_detail(request, slug):
             'author': comment.author.username,
         })
 
-    related_tags = post.tags.popular().serialized()
-
     serialized_post = {
         'title': post.title,
         'text': post.text,
-        'author': post.author.username,
+        'author': posts[post.id]['author'],
         'comments': serialized_comments,
         'likes_amount': post.likes.count(),
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
-        'tags': related_tags,
+        'tags': posts[post.id]['tags'],
     }
 
-    popular_posts_ids = Post.objects.popular_ids(5)
-    posts = Post.objects.serialized(popular_posts_ids)
     context = {
         'post': serialized_post,
         'popular_tags': Tag.objects.most_popular_serialized(5),

@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 from django.contrib.auth.models import User
 from django.db import models, connection
 from django.db.models import Count, F, Prefetch
@@ -8,71 +6,54 @@ from django.urls import reverse
 
 
 class PostQuerySet(models.QuerySet):
-    # def popular_ids_old(self,quantity):
-    #     return list(self
-    #                 .annotate(likes_count=Count('likes',distinct=True))
-    #                 .order_by('-likes_count')
-    #                 .values_list('id',flat=True)[:quantity]
-    #             )
 
     def popular_ids(self, quantity):
-        '''this query is 10 times faster than popular_ids_old()'''
-        sql=f"""SELECT post_id, COUNT(*) as likes_count 
+        sql = f"""SELECT post_id, COUNT(*) as likes_count 
                 FROM blog_post_likes
                 GROUP BY post_id 
                 ORDER BY likes_count DESC 
                 LIMIT {quantity};"""
         with connection.cursor() as cursor:
             cursor.execute(sql)
-            likes_count=list(dict(cursor.fetchall()))
+            likes_count = list(dict(cursor.fetchall()))
         return likes_count
 
-    def fresh_ids(self,quantity):
-        return list(self.only('id').order_by('-published_at').values_list('id',flat=True)[:quantity])
+    def fresh_ids(self, quantity):
+        return list(self.only('id').order_by('-published_at').values_list('id', flat=True)[:quantity])
 
-    # def tags_by_ids(self,ids):
-    #     sql=f"SELECT post_id, tag_id FROM blog_post_tags WHERE post_id IN {tuple(ids)};"
-    #     with connection.cursor() as cursor:
-    #         cursor.execute(sql)
-    #         post_tag_pairs=cursor.fetchall()
-    #     tags_by_posts = defaultdict(list)
-    #     for pair in post_tag_pairs:
-    #         tags_by_posts[pair[0]].append(pair[1])
-    #     return dict(tags_by_posts)
-
-    def serialized(self,ids):
-        prefetched_comments=Prefetch(
+    def serialized(self, ids):
+        prefetched_comments = Prefetch(
             'comments',
             queryset=(Comment.objects.filter(post__in=ids).only('post'))
         )
-        prefetched_tags=Prefetch(
+        prefetched_tags = Prefetch(
             'tags',
             queryset=Tag.objects.all().annotate(posts_count=Count('posts'))
         )
-        query=(self
-               .filter(id__in=ids)
-               .select_related('author')
-               .prefetch_related(prefetched_comments,prefetched_tags)
-               .annotate(teaser_text=Left('text',200))
-               .annotate(author_name=F('author__username'))
-               .annotate(comments_amount=Count('comments'))
-               .defer('text','likes')
-               )
-        result={}
+        query = (self
+                 .filter(id__in=ids)
+                 .select_related('author')
+                 .prefetch_related(prefetched_comments, prefetched_tags)
+                 .annotate(teaser_text=Left('text', 200))
+                 .annotate(author_name=F('author__username'))
+                 .annotate(comments_amount=Count('comments'))
+                 .defer('text', 'likes')
+                 )
+        result = {}
         for post in query:
-            serialized_tags=[{'title':tag.title,'posts_with_tag':tag.posts_count}
-                             for tag in post.tags.all()]
+            serialized_tags = [{'title': tag.title, 'posts_with_tag': tag.posts_count}
+                               for tag in post.tags.all()]
             result.update({
-                post.id:{
-                    'title':post.title,
+                post.id: {
+                    'title': post.title,
                     'teaser_text': post.teaser_text,
-                    'author':post.author_name,
-                    'image_url':post.image.url if post.image else None,
-                    'published_at':post.published_at,
-                    'slug':post.slug,
-                    'comments_amount':post.comments_amount,
-                    'tags':serialized_tags,
-                    'first_tag_title':serialized_tags[0]['title'],
+                    'author': post.author_name,
+                    'image_url': post.image.url if post.image else None,
+                    'published_at': post.published_at,
+                    'slug': post.slug,
+                    'comments_amount': post.comments_amount,
+                    'tags': serialized_tags,
+                    'first_tag_title': serialized_tags[0]['title'],
                 }
             })
         return result
@@ -119,22 +100,12 @@ class Post(models.Model):
 class TagQuerySet(models.QuerySet):
     def popular(self):
         return self.annotate(posts_count=Count('posts')).order_by('-posts_count')
-    def most_popular_serialized(self,quantity):
+
+    def most_popular_serialized(self, quantity):
         return [{'title': tag.title, 'posts_with_tag': tag.posts_count}
                 for tag in self.popular()[:quantity]]
 
-    def with_posts_count(self):
-        return self.annotate(posts_count=Count('posts'))
 
-    def serialized(self):
-        return list([{'title': tag.title, 'posts_with_tag': tag.posts_count}
-                     for tag in self])
-
-    def popular_as_dict(self):
-        rez = {}
-        for tag in self.popular():
-            rez.update({tag.id: {'title': tag.title, 'posts_with_tag': tag.posts_count}})
-        return rez
 
 class Tag(models.Model):
     title = models.CharField('Тег', max_length=20, unique=True)

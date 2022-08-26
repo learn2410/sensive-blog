@@ -13,10 +13,6 @@ class PostAdmin(admin.ModelAdmin):
 admin.site.register(Tag)
 
 
-class Ptrfetch(object):
-    pass
-
-
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
     list_per_page = 25
